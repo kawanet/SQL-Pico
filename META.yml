@@ -1,0 +1,26 @@
+--- #YAML:1.0
+name:               SQL-Pico
+version:            1.0
+abstract:           A wrapper for DBI's quote and quote_identifier methods
+author:
+    - Yusuke Kawasaki
+license:            perl
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  6.55
+build_requires:
+    Test::More:  0
+requires:
+    Carp:          0
+    DBI:           1.21
+    Exporter:      0
+    File::Spec:    0
+    Scalar::Util:  0
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.56
+meta-spec:
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4

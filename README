@@ -1,0 +1,127 @@
+NAME
+    SQL::Pico - A wrapper for DBI's quote and quote_identifier methods
+
+SYNOPSIS
+    OO style:
+
+        use SQL::Pico ();                         # nothing exported
+
+        $dbh    = DBI->connect(...);
+        $pico   = SQL::Pico->new->dbh($dbh);
+
+        $quoted = $pico->quote($val);             # $dbh->quote($val)
+        $quoted = $pico->quote_identifier($key);  # $dbh->quote_identifier($key)
+        $sql    = $pico->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+
+        @list   = $pico->quote(@vals);            # multiple quotes at once
+        @list   = $pico->quote_identifier(@keys); # ditto.
+
+    Functional style:
+
+        use SQL::Pico;                            # methods exported
+    
+        $quoted = v("string");                    # quotes literal
+        $quoted = k("table_name");                # quotes identifier
+        $sql    = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
+
+DESCRIPTION
+    This is a simple wrapper for DBI's "quote()" and "quote_identifier()"
+    methods with some useful features.
+
+METHODS
+  new(PARAMETERS)
+    This returns a "SQL::Pico" instance.
+
+        $pico = SQL::Pico->new;
+
+    This accepts key/value pair(s) as its initial parameters. Only "dbh"
+    parameter is available at this module.
+
+        $pico = SQL::Pico->new(dbh => $dbh);
+
+  dbh(DBHANDLE)
+    This is accessor to specify DBI instance.
+
+        $pico = SQL::Pico->new;
+        $pico->dbh($dbh);
+
+    The setter returns the current "SQL::Pico" instance for you to chain
+    method calls.
+
+        $quoted = SQL::Pico->new->dbh($dbh)->quote($val);
+
+  quote(LITERAL)
+    This calls DBI's "quote()" method internally.
+
+        $quoted = $pico->quote($val);             # $dbh->quote($val)
+        @list   = $pico->quote(@vals);            # multiple quotes at once
+
+    This doesn't accept literal's data type specified at its second
+    argument. The other difference to original is that this accept multiple
+    arguments and returns them quoted.
+
+  quote_identifier(IDENTIFIER)
+    This calls DBI's "quote_identifier()" method internally.
+
+        $quoted = $pico->quote_identifier($key);  # $dbh->quote_identifier($key)
+        @list   = $pico->quote_identifier(@keys); # multiple quotes at once
+
+    Multiple arguments are allowed as well.
+
+  bind(SQL, VALUES...)
+    This builds a SQL statement by using placeholders with bind values
+
+        $sql = $pico->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+
+    Note that this returns a SQL statement built with values binded at the
+    method prior to DBI's <execute()> method called.
+
+    Single "?" string represents a placeholder for a literal. As this
+    module's additional feature, "??" string represents a placeholder for an
+    identifier, on the other hand.
+
+FUNCTIONS
+    In addition to the OO style described above, this also supports the
+    functional style and exports three shortcut functions: "v()", "k()" and
+    "sql()" per default.
+
+  v(LITERAL)
+    This is a shortcut for "quote()" method which quotes a literal, e.g.
+    string, number, etc.
+
+        $quoted = v("string");                    # quotes literal
+
+  k(IDENTIFIER)
+    This is a shortcut for "quote_identifier()" method which quotes an
+    identifier, e.g. table name, column name, etc.
+
+        $quoted = k("table_name");                # quotes identifier
+
+  sql(SQL, VALUES...)
+    This is a shortcut for "bind()" method which builds a SQL statement by
+    using placeholders with bind values.
+
+        $sql = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
+
+  Database Handle
+    The escaping style varies. For example, a literal string "Don't" would
+    be quoted as 'Don''t', 'Don\'t', "Don't", etc. It depends on database
+    systems. Use "dbh()" method to specify database handle which will be
+    used to call "quote()".
+
+        $dbh = DBI->connect(...);
+        SQL::Pico->dbh($dbh);
+
+AUTHOR
+    Yusuke Kawasaki http://www.kawa.net/
+
+COPYRIGHT
+    The following copyright notice applies to all the files provided in this
+    distribution, including binary files, unless explicitly noted otherwise.
+
+    Copyright 2012 Yusuke Kawasaki
+
+LICENSE
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+

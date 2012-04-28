@@ -9,7 +9,7 @@ Build.bat
 Makefile
 Makefile.old
 MANIFEST.bak
-META.yml
+# META.yml
 MYMETA.yml
 nytprof.out
 pm_to_blib
