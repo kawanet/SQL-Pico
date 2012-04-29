@@ -10,6 +10,7 @@ t/01_functional.t
 t/02_oo.t
 t/03_dbh.t
 t/04_error.t
+t/05_practical.t
 t/10_compile.t
 t/11_oo.t
 t/12_internal.t
@@ -18,3 +19,5 @@ t/14_single.t
 t/15_multiple.t
 t/16_constant.t
 t/17_subclass.t
+t/20_synopsis_pico.t
+t/21_synopsis_table.t

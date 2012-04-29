@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use base 'SQL::Pico';
 
-our $VERSION = '1.0';
+our $VERSION = '0.01';
 
 use Carp;
 use Scalar::Util;
@@ -195,8 +195,13 @@ sub update {
     my $keys = [grep {exists $hash->{$_}} @$column];
     Carp::croak "No column will be updated" unless @$keys;
 
-    my $sets  = [map {$self->bind("$_ = ?" => $hash->{$_})} @$keys];
-    my $sjoin = join ", " => @$sets;
+    # my $sets  = [map {$self->bind("?? = ?" => $_, $hash->{$_})} @$keys];
+    # my $sjoin = join ", " => @$sets;
+
+    my $vals  = [map {$hash->{$_}} @$keys];
+    my %pairs;
+    @pairs{@$keys} = @$vals;
+    my $sjoin = join ", " => $self->bind("?? = ?" => %pairs);
 
     my $table = $self->quote_identifier($self->table);
     my $sql   = "UPDATE $table SET $sjoin $where";
@@ -243,10 +248,10 @@ SQL::Pico::Table - Simple SQL Statement Builder
     $sql  = $mytbl->select({id => 1});
     $hash = $dbh->selectrow_hashref($sql);
 
-    $sql = $mytbl->insert({key => 'val'});
+    $sql = $mytbl->insert({name => 'foobar'});
     $dbh->do($sql) or die "insert failed";
 
-    $sql = $mytbl->update({key => 'val'}, {id => 1});
+    $sql = $mytbl->update({name => 'foobar'}, {id => 1});
     $dbh->do($sql) or die "update failed";
 
     $sql = $mytbl->delete({id => 1});
@@ -328,14 +333,14 @@ At the sample codes below, parameters are initialized as following.
     $mytbl = SQL::Pico::Table->new;
     $mytbl->table('mytable');
     $mytbl->primary('id');
-    $mytbl->readable(qw( k1 k2 ));
-    $mytbl->writable(qw( k1 k2 ));
+    $mytbl->readable(qw( name price ));
+    $mytbl->writable(qw( name price ));
 
 =head2 select(CONDITION)
 
 This builds a C<SELECT> statement which reads record(s) from database.
 
-    # SELECT k1, k2 FROM mytable WHERE id = '1'
+    # SELECT name, price FROM mytable WHERE id = '1'
     $sql  = $mytbl->select({id => 1}); 
     $hash = $dbh->selectrow_hashref($sql);
 
@@ -346,9 +351,9 @@ Primary keys must be specified by C<primary()> accessor in advance.
 Please note that this style is not a generic condition builder.
 Any other keys than C<primary> keys in given hashref are ignored.
 
-    # SELECT k1, k2 FROM mytable
+    # SELECT name, price FROM mytable
     $sql       = $mytbl->select;
-    $hasharray = $dbh->selectall_arrayref($sql, {});
+    $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
 
 Without a condition applied, this builds a C<SELECT> statement
 which returns all records.
@@ -357,8 +362,8 @@ which returns all records.
 
 This builds an C<INSERT> statement which creates a record.
 
-    # INSERT INTO mytable ( k1, k2 ) VALUES ( 'v1', 'v2' )
-    $sql = $mytbl->insert({k1 => 'v1', k2 => 'v2'});
+    # INSERT INTO mytable ( name, price ) VALUES ( 'corge', '100' )
+    $sql = $mytbl->insert({name => 'corge', price => '100'});
     $dbh->do($sql) or die "insert failed";
 
 The argument is a hashref which contains C<writable> keys.
@@ -368,8 +373,8 @@ Any other keys than C<writable> keys in given hashref are ignored.
 
 This builds an C<UPDATE> statement which updates record(s).
 
-    # UPDATE mytable SET k1 = 'v1', k2 = 'v2' WHERE id = '1'
-    $sql = $mytbl->update({k1 => 'v1', k2 => 'v2'}, {id => 1});
+    # UPDATE mytable SET name = 'corge', price = '100' WHERE id = '1'
+    $sql = $mytbl->update({name => 'corge', price => '100'}, {id => 1});
     $dbh->do($sql) or die "update failed";
 
 The first argument is a hashref which contains C<writable> keys.
@@ -423,23 +428,28 @@ which returns the total number of records.
 =head2 Direct Condition
 
 C<select>, C<update>, C<delete>, C<index> and C<count> methods also
-allow a string of C<WHERE> phrase as their condition argument.
+allow a string of C<WHERE> clause as their condition argument.
 This uses C<bind> method internally to accept placeholders and bind values.
 
-    # SELECT * FROM mytable WHERE date < '2012-04-28'
-    $sql = $mytbl->select("WHERE date < ?", "2012-04-28");
+    # SELECT * FROM mytable WHERE price < '100'
+    $sql = $mytbl->select("WHERE price < ?", "100");
+    $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
 
-    # UPDATE mytable SET k1 = 'v1' WHERE date < '2012-04-28'
-    $sql = $mytbl->update({k1 => 'v1'}, "WHERE date < ?", "2012-04-28");
+    # UPDATE mytable SET name = 'corge' WHERE price < '100'
+    $sql = $mytbl->update({name => 'corge'}, "WHERE price < ?", "100");
+    $dbh->do($sql) or die "update failed";
 
-    # DELETE FROM mytable WHERE date < '2012-04-28'
-    $sql = $mytbl->delete("WHERE date < ?", "2012-04-28");
+    # DELETE FROM mytable WHERE price < '100'
+    $sql = $mytbl->delete("WHERE price < ?", "100");
+    $dbh->do($sql) or die "delete failed";
 
-    # SELECT id FROM mytable WHERE date < '2012-04-28'
-    $sql = $mytbl->index("WHERE date < ?", "2012-04-28");
+    # SELECT id FROM mytable WHERE price < '100'
+    $sql = $mytbl->index("WHERE price < ?", "100");
+    $arrayref = $dbh->selectcol_arrayref($sql);
 
-    # SELECT count(*) FROM mytable WHERE date < '2012-04-28'
-    $sql = $mytbl->count("WHERE date < ?", "2012-04-28");
+    # SELECT count(*) FROM mytable WHERE price < '100'
+    $sql = $mytbl->count("WHERE price < ?", "100");
+    $total = $dbh->selectrow_array($sql);
 
 =head2 Methods Inherited
 

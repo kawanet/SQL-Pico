@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 15;
+use Test::More tests => 18;
 
 BEGIN { use_ok 'SQL::Pico' }
 
@@ -32,10 +32,22 @@ is($test[0], '"foo"', 'quote_identifier(L1, L2) - L1');
 is($test[1], '"bar"', 'quote_identifier(L1, L2) - L2');
 
 $test = $pico->bind("SELECT * FROM ?? WHERE deleted = 0", "table_name");
-is($test, 'SELECT * FROM "table_name" WHERE deleted = 0', 'bind_identifier(SQL, I1)');
+is($test, 'SELECT * FROM "table_name" WHERE deleted = 0', 'bind(SQL, I1)');
 
 $test = $pico->bind("SELECT * FROM ?? WHERE ?? = 0", "table_name", "deleted");
-is($test, 'SELECT * FROM "table_name" WHERE "deleted" = 0', 'bind_identifier(SQL, I1, I2)');
+is($test, 'SELECT * FROM "table_name" WHERE "deleted" = 0', 'bind(SQL, I1, I2)');
 
 $test = $pico->bind("SELECT * FROM ?? WHERE id = ?", "table_name", "id");
-is($test, 'SELECT * FROM "table_name" WHERE id = '."'id'", 'sql(SQL, I1, L1)');
+is($test, 'SELECT * FROM "table_name" WHERE id = '."'id'", 'bind(SQL, I1, L1)');
+
+my $hash = { k1 => 'v1', k2 => 'v2' };
+my $where;
+
+$where = join " AND " => map {$pico->bind("?? = ?", $_, $hash->{$_})} sort keys %$hash;
+is($where, q{"k1" = 'v1' AND "k2" = 'v2'}, 'join map bind sort keys');
+
+$where = join " AND " => sort $pico->bind("?? = ?", %$hash);
+is($where, q{"k1" = 'v1' AND "k2" = 'v2'}, 'join sort bind');
+
+$test = $pico->bind("SELECT * FROM ?? WHERE ???", "table_name", $where);
+is($test, q{SELECT * FROM "table_name" WHERE "k1" = 'v1' AND "k2" = 'v2'}, 'bind(I1, S1)');

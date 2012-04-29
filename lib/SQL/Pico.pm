@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use base 'Exporter';
 
-our $VERSION = '1.0';
+our $VERSION = '0.01';
 our @EXPORT  = qw(v k sql);
 our @DSN     = ("dbi:NullP:");
 
@@ -63,16 +63,25 @@ sub quote_identifier {
 sub bind {
     my $self = shift;
     my $sql  = shift;
+    Carp::croak "SQL statement not given" unless defined $sql;
     $self = $self->instance unless ref $self;
     my $dbh   = $self->dbh;
-    my $param = @_;
-    my $count = ($sql =~ s{(\?+)}{
-        $1 eq '?' ? $dbh->quote(shift) :
-        $1 eq '??' ? $dbh->quote_identifier(shift) :
-        Carp::croak "Invalid placeholder: '$1'";
-    }ge);
-    Carp::croak "Place holder mismatch: holder=$count param=$param" if ($count != $param);
-    $sql;
+    my $list  = [];
+    while (1) {
+        my $str = "$sql"; # copy
+        my $cnt = ($str =~ s{(\?+)}{
+            Carp::croak "Parameter shortage" unless @_;
+            $1 eq '?' ? $dbh->quote(shift) :
+            $1 eq '??' ? $dbh->quote_identifier(shift) :
+            $1 eq '???' ? shift :
+            Carp::croak "Invalid placeholder: '$1'";
+        }ge);
+        push(@$list, $str);
+        last unless @_;
+        Carp::croak "Placeholder not found while parameters given" unless $cnt;
+        Carp::croak "Too many parameters given" unless wantarray;
+    }
+    wantarray ? @$list : shift @$list;
 }
 
 1;
@@ -81,42 +90,57 @@ __END__
 
 =head1 NAME
 
-SQL::Pico - A wrapper for DBI's quote and quote_identifier methods
+SQL::Pico - Prebinded Raw SQL Statement Builder
 
 =head1 SYNOPSIS
 
-OO style:
-    
-    use SQL::Pico ();                         # nothing exported
+Basic usage:
 
+    use SQL::Pico ();
+    
     $dbh    = DBI->connect(...);
     $pico   = SQL::Pico->new->dbh($dbh);
-
+    
     $quoted = $pico->quote($val);             # $dbh->quote($val)
     $quoted = $pico->quote_identifier($key);  # $dbh->quote_identifier($key)
     $sql    = $pico->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
-
+    
     @list   = $pico->quote(@vals);            # multiple quotes at once
     @list   = $pico->quote_identifier(@keys); # ditto.
+    @list   = $pico->bind("?? = ?", %hash);   # key/value pairs
 
-Functional style:
+Practical usage:
 
-    use SQL::Pico;                            # methods exported
-    
-    $quoted = v("string");                    # quotes literal
-    $quoted = k("table_name");                # quotes identifier
-    $sql    = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $where  = join(" AND " => $pico->bind("?? = ?", %hash));
+    $select = $pico->bind("SELECT * FROM mytbl WHERE ???", $where);
+
+    $keys   = join(", " => $pico->quote_identifier(keys %hash));
+    $vals   = join(", " => $pico->quote(values %hash));
+    $insert = $pico->bind("INSERT INTO mytbl (???) VALUES (???)", $keys, $vals);
+
+    $sets   = join(", " => $pico->bind("?? = ?", %hash));
+    $update = $pico->bind("UPDATE mytbl SET ??? WHERE id = ?", $sets, $id);
+
+    $in     = join(", " => v(@list));
+    $delete = $pico->bind("DELETE mytbl WHERE id IN (???)", $in);
 
 =head1 DESCRIPTION
 
-This is a simple wrapper for L<DBI>'s C<quote()> and C<quote_identifier()>
-methods with some useful features.
+This provides a simple but safe way to build SQL statements
+without learning any other languages than Perl and SQL.
+
+Most of ORM modules and something SQL::Builder modules would have
+required you to understand a complex structure or dialectal DSL.
+This module provides just one new method of C<bind()>,
+which allows you to build raw SQL statements with placeholders,
+as well as C<quote()> and C<quote_identifier()> methods
+which are wrappers of L<DBI>'s same methods you already know.
 
 =head1 METHODS
 
 =head2 new(PARAMETERS)
 
-This returns a C<SQL::Pico> instance.
+This creates a C<SQL::Pico> instance.
 
     $pico = SQL::Pico->new;
 
@@ -127,7 +151,7 @@ Only C<dbh> parameter is available at this module.
 
 =head2 dbh(DBHANDLE)
 
-This is accessor to specify L<DBI> instance.
+This is accessor to specify a C<DBI> instance.
 
     $pico = SQL::Pico->new;
     $pico->dbh($dbh);
@@ -137,39 +161,64 @@ to chain method calls.
 
     $quoted = SQL::Pico->new->dbh($dbh)->quote($val);
 
+The quoting format depends on database systems.
+For example, a literal string "Don't" would be quoted as
+'Don''t', 'Don\'t', "Don't", etc.
+You need to specify a C<DBI> instance to make string quoted propery.
+
 =head2 quote(LITERAL)
 
-This calls L<DBI>'s C<quote()> method internally.
+This calls C<DBI>'s C<quote()> method internally.
 
     $quoted = $pico->quote($val);             # $dbh->quote($val)
-    @list   = $pico->quote(@vals);            # multiple quotes at once
 
 This doesn't accept literal's data type specified at its second argument.
 The other difference to original is that this accept multiple arguments
 and returns them quoted.
 
+    @list   = $pico->quote(@vals);            # multiple quotes at once
+
 =head2 quote_identifier(IDENTIFIER)
 
-This calls L<DBI>'s C<quote_identifier()> method internally.
+This calls C<DBI>'s C<quote_identifier()> method internally.
 
     $quoted = $pico->quote_identifier($key);  # $dbh->quote_identifier($key)
-    @list   = $pico->quote_identifier(@keys); # multiple quotes at once
 
 Multiple arguments are allowed as well.
 
+    @list   = $pico->quote_identifier(@keys); # multiple quotes at once
+
 =head2 bind(SQL, VALUES...)
 
-This builds a SQL statement by using placeholders with bind values
+This builds a SQL statement by using placeholders with bind values.
 
     $sql = $pico->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
 
 Note that this returns a SQL statement built with values binded
-at the method prior to L<DBI>'s <execute()> method called.
+at the method prior to C<DBI>'s <execute()> method called.
 
-Single C<?> string represents a placeholder for a literal.
-As this module's additional feature,
-C<??> string represents a placeholder for an identifier,
-on the other hand.
+Three types of placeholders are allowed at the first argument:
+
+Single character of C<?> represents a placeholder for a literal
+which will be escaped by C<quote()>.
+
+Double characters of C<??> represents a placeholder for an identifier
+which will be escaped by C<quote_identifier()>.
+
+Triple characters of C<???> represents a placeholder for a raw SQL
+string which will not be escaped.
+
+    $hash   = {"qux" => "foo", "quux" => "bar", "corge" => "baz"};
+    @list   = $pico->bind("?? = ?", %$hash);
+    $where  = join(" AND ", @list);
+    $select = "SELECT * FROM mytable WHERE $where";
+
+    # WHERE "qux" = 'foo' AND "quux" = 'bar' AND "corge" = 'baz'
+    # Note that the order of key/value pairs varies.
+
+In list context, this returns a list of strings repeatedly binded
+with parameters following.
+It'd be useful to build C<WHERE>, C<VALUES>, C<SET>, C<IN> clause, etc.
 
 =head1 FUNCTIONS
 
@@ -177,12 +226,19 @@ In addition to the OO style described above, this also supports
 the functional style and exports three shortcut functions:
 C<v()>, C<k()> and C<sql()> per default.
 
+    use SQL::Pico;                            # functions exported
+    
+    $quoted = v("string");                    # quotes literal
+    $quoted = k("table_name");                # quotes identifier
+    $sql    = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
+
 =head2 v(LITERAL)
 
 This is a shortcut for C<quote()> method
 which quotes a literal, e.g. string, number, etc.
 
     $quoted = v("string");                    # quotes literal
+    @quoted = v("foo", "bar", "baz");         # multiple literals
 
 =head2 k(IDENTIFIER)
 
@@ -190,23 +246,24 @@ This is a shortcut for C<quote_identifier()> method
 which quotes an identifier, e.g. table name, column name, etc.
 
     $quoted = k("table_name");                # quotes identifier
+    @quoted = k("qux", "quux", "corge");      # multiple identifiers
 
 =head2 sql(SQL, VALUES...)
 
 This is a shortcut for C<bind()> method
 which builds a SQL statement by using placeholders with bind values.
 
-    $sql = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $sql  = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
 
-=head2 Database Handle
+=head2 dbh(DBHANDLE)
 
-The escaping style varies.
-For example, a literal string C<Don't> would be quoted as
-C<'Don''t'>, C<'Don\'t'>, C<"Don't">, etc. It depends on database systems.
-Use C<dbh()> method to specify database handle which will be used to call C<quote()>.
+Use C<dbh()> class method to specify the default database handle
+for those C<v()>, C<k()> and C<sql()> functions above.
 
     $dbh = DBI->connect(...);
     SQL::Pico->dbh($dbh);
+
+Note that C<dbh()> method is not exported.
 
 =head1 AUTHOR
 
@@ -224,5 +281,11 @@ Copyright 2012 Yusuke Kawasaki
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+L<DBI> executes SQL statements built by the module.
+
+L<SQL::Abstract::Query> provides a list of other SQL generators as reference.
 
 =cut

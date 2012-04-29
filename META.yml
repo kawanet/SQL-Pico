@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:               SQL-Pico
-version:            1.0
-abstract:           A wrapper for DBI's quote and quote_identifier methods
+version:            0.01
+abstract:           Prebinded Raw SQL Statement Builder
 author:
     - Yusuke Kawasaki
 license:            perl
