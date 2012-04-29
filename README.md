@@ -1,4 +1,0 @@
-SQL-Pico
-========
-
-SQL-Pico
