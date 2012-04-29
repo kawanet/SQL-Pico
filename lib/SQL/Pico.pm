@@ -94,23 +94,15 @@ SQL::Pico - Prebinded Raw SQL Statement Builder
 
 =head1 SYNOPSIS
 
-Basic usage:
-
     use SQL::Pico ();
     
     $dbh    = DBI->connect(...);
     $sqlp   = SQL::Pico->new->dbh($dbh);
-    
     $quoted = $sqlp->quote($val);             # $dbh->quote($val)
     $quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
-    $sql    = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+
+    $select = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
     
-    @list   = $sqlp->quote(@vals);            # multiple quotes at once
-    @list   = $sqlp->quote_identifier(@keys); # ditto.
-    @list   = $sqlp->bind("?? = ?", %hash);   # key/value pairs
-
-Practical usage:
-
     $where  = join(" AND " => $sqlp->bind("?? = ?", %hash));
     $select = $sqlp->bind("SELECT * FROM mytbl WHERE ???", $where);
 
