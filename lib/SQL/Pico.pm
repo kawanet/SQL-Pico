@@ -99,30 +99,30 @@ Basic usage:
     use SQL::Pico ();
     
     $dbh    = DBI->connect(...);
-    $pico   = SQL::Pico->new->dbh($dbh);
+    $sqlp   = SQL::Pico->new->dbh($dbh);
     
-    $quoted = $pico->quote($val);             # $dbh->quote($val)
-    $quoted = $pico->quote_identifier($key);  # $dbh->quote_identifier($key)
-    $sql    = $pico->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $quoted = $sqlp->quote($val);             # $dbh->quote($val)
+    $quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
+    $sql    = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
     
-    @list   = $pico->quote(@vals);            # multiple quotes at once
-    @list   = $pico->quote_identifier(@keys); # ditto.
-    @list   = $pico->bind("?? = ?", %hash);   # key/value pairs
+    @list   = $sqlp->quote(@vals);            # multiple quotes at once
+    @list   = $sqlp->quote_identifier(@keys); # ditto.
+    @list   = $sqlp->bind("?? = ?", %hash);   # key/value pairs
 
 Practical usage:
 
-    $where  = join(" AND " => $pico->bind("?? = ?", %hash));
-    $select = $pico->bind("SELECT * FROM mytbl WHERE ???", $where);
+    $where  = join(" AND " => $sqlp->bind("?? = ?", %hash));
+    $select = $sqlp->bind("SELECT * FROM mytbl WHERE ???", $where);
 
-    $keys   = join(", " => $pico->quote_identifier(keys %hash));
-    $vals   = join(", " => $pico->quote(values %hash));
-    $insert = $pico->bind("INSERT INTO mytbl (???) VALUES (???)", $keys, $vals);
+    $keys   = join(", " => $sqlp->quote_identifier(keys %hash));
+    $vals   = join(", " => $sqlp->quote(values %hash));
+    $insert = $sqlp->bind("INSERT INTO mytbl (???) VALUES (???)", $keys, $vals);
 
-    $sets   = join(", " => $pico->bind("?? = ?", %hash));
-    $update = $pico->bind("UPDATE mytbl SET ??? WHERE id = ?", $sets, $id);
+    $sets   = join(", " => $sqlp->bind("?? = ?", %hash));
+    $update = $sqlp->bind("UPDATE mytbl SET ??? WHERE id = ?", $sets, $id);
 
     $in     = join(", " => v(@list));
-    $delete = $pico->bind("DELETE mytbl WHERE id IN (???)", $in);
+    $delete = $sqlp->bind("DELETE mytbl WHERE id IN (???)", $in);
 
 =head1 DESCRIPTION
 
@@ -142,19 +142,19 @@ which are wrappers of L<DBI>'s same methods you already know.
 
 This creates a C<SQL::Pico> instance.
 
-    $pico = SQL::Pico->new;
+    $sqlp = SQL::Pico->new;
 
 This accepts key/value pair(s) as its initial parameters.
 Only C<dbh> parameter is available at this module.
 
-    $pico = SQL::Pico->new(dbh => $dbh);
+    $sqlp = SQL::Pico->new(dbh => $dbh);
 
 =head2 dbh(DBHANDLE)
 
 This is accessor to specify a C<DBI> instance.
 
-    $pico = SQL::Pico->new;
-    $pico->dbh($dbh);
+    $sqlp = SQL::Pico->new;
+    $sqlp->dbh($dbh);
 
 The setter returns the current C<SQL::Pico> instance for you
 to chain method calls.
@@ -170,29 +170,29 @@ You need to specify a C<DBI> instance to make string quoted propery.
 
 This calls C<DBI>'s C<quote()> method internally.
 
-    $quoted = $pico->quote($val);             # $dbh->quote($val)
+    $quoted = $sqlp->quote($val);             # $dbh->quote($val)
 
 This doesn't accept literal's data type specified at its second argument.
 The other difference to original is that this accept multiple arguments
 and returns them quoted.
 
-    @list   = $pico->quote(@vals);            # multiple quotes at once
+    @list   = $sqlp->quote(@vals);            # multiple quotes at once
 
 =head2 quote_identifier(IDENTIFIER)
 
 This calls C<DBI>'s C<quote_identifier()> method internally.
 
-    $quoted = $pico->quote_identifier($key);  # $dbh->quote_identifier($key)
+    $quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
 
 Multiple arguments are allowed as well.
 
-    @list   = $pico->quote_identifier(@keys); # multiple quotes at once
+    @list   = $sqlp->quote_identifier(@keys); # multiple quotes at once
 
 =head2 bind(SQL, VALUES...)
 
 This builds a SQL statement by using placeholders with bind values.
 
-    $sql = $pico->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $sql = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
 
 Note that this returns a SQL statement built with values binded
 at the method prior to C<DBI>'s <execute()> method called.
@@ -209,7 +209,7 @@ Triple characters of C<???> represents a placeholder for a raw SQL
 string which will not be escaped.
 
     $hash   = {"qux" => "foo", "quux" => "bar", "corge" => "baz"};
-    @list   = $pico->bind("?? = ?", %$hash);
+    @list   = $sqlp->bind("?? = ?", %$hash);
     $where  = join(" AND ", @list);
     $select = "SELECT * FROM mytable WHERE $where";
 

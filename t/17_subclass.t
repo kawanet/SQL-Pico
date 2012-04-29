@@ -3,7 +3,7 @@ use Test::More tests => 14;
 
 BEGIN { use_ok 'SQL::Pico::Table' }
 
-my $pico = MyTestClass->new;
+my $sqlp = MyTestClass->new;
 my $sql;
 
 sub std {
@@ -16,43 +16,43 @@ sub std {
 my @sql  = ("WHERE key = ?", "val");
 my $hash = { pk => 'id', key => 'val' };
 
-$sql = $pico->index;
+$sql = $sqlp->index;
 is(std($sql), "SELECT pk FROM tbl WHERE deleted = 0", 'index()');
 
-$sql = $pico->index(@sql);
+$sql = $sqlp->index(@sql);
 is(std($sql), "SELECT pk FROM tbl WHERE deleted = 0 AND key = 'val'", 'index(SQL)');
 
-$sql = $pico->select;
+$sql = $sqlp->select;
 is(std($sql), "SELECT key FROM tbl WHERE deleted = 0", 'select()');
 
-$sql = $pico->select(@sql);
+$sql = $sqlp->select(@sql);
 is(std($sql), "SELECT key FROM tbl WHERE deleted = 0 AND key = 'val'", 'select(SQL)');
 
-$sql = $pico->select($hash);
+$sql = $sqlp->select($hash);
 is(std($sql), "SELECT key FROM tbl WHERE deleted = 0 AND pk = 'id'", 'select(HASH)');
 
-$sql = $pico->insert($hash);
+$sql = $sqlp->insert($hash);
 is(std($sql), "INSERT INTO tbl ( key ) VALUES ('val')", 'insert(HASH)');
 
-$sql = $pico->update($hash, @sql);
+$sql = $sqlp->update($hash, @sql);
 is(std($sql), "UPDATE tbl SET key = 'val' WHERE deleted = 0 AND key = 'val'", 'update(HASH, SQL)');
 
-$sql = $pico->update($hash, $hash);
+$sql = $sqlp->update($hash, $hash);
 is(std($sql), "UPDATE tbl SET key = 'val' WHERE deleted = 0 AND pk = 'id'", 'update(HASH, HASH)');
 
-$sql = $pico->delete(@sql);
+$sql = $sqlp->delete(@sql);
 is(std($sql), "DELETE FROM tbl WHERE deleted = 0 AND key = 'val'", 'delete(SQL)');
 
-$sql = $pico->delete($hash);
+$sql = $sqlp->delete($hash);
 is(std($sql), "DELETE FROM tbl WHERE deleted = 0 AND pk = 'id'", 'delete(HASH)');
 
-$sql = $pico->count;
+$sql = $sqlp->count;
 is(std($sql), "SELECT count(*) FROM tbl WHERE deleted = 0", 'count()');
 
-$sql = $pico->count(@sql);
+$sql = $sqlp->count(@sql);
 is(std($sql), "SELECT count(*) FROM tbl WHERE deleted = 0 AND key = 'val'", 'count(SQL)');
 
-$sql = $pico->count($hash);
+$sql = $sqlp->count($hash);
 is(std($sql), "SELECT count(*) FROM tbl WHERE deleted = 0 AND pk = 'id'", 'count(HASH)');
 
 package MyTestClass;

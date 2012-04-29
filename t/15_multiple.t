@@ -3,11 +3,11 @@ use Test::More tests => 14;
 
 BEGIN { use_ok 'SQL::Pico::Table' }
 
-my $pico = SQL::Pico::Table->new;
-$pico->table("tbl");
-$pico->primary("p1", "p2");
-$pico->readable("r1", "r2");
-$pico->writable("w1", "w2");
+my $sqlp = SQL::Pico::Table->new;
+$sqlp->table("tbl");
+$sqlp->primary("p1", "p2");
+$sqlp->readable("r1", "r2");
+$sqlp->writable("w1", "w2");
 my $sql;
 
 sub std {
@@ -20,41 +20,41 @@ sub std {
 my @sql  = ("WHERE r1 = ? AND w2 = ?", "v1", "v2");
 my $hash = { p1 => 'i1', p2 => 'i2', w1 => 'v1', w2 => 'v2' };
 
-$sql = $pico->index;
+$sql = $sqlp->index;
 is(std($sql), "SELECT p1 , p2 FROM tbl", 'index()');
 
-$sql = $pico->index(@sql);
+$sql = $sqlp->index(@sql);
 is(std($sql), "SELECT p1 , p2 FROM tbl WHERE r1 = 'v1' AND w2 = 'v2'", 'index(SQL)');
 
-$sql = $pico->select;
+$sql = $sqlp->select;
 is(std($sql), "SELECT r1 , r2 FROM tbl", 'select()');
 
-$sql = $pico->select(@sql);
+$sql = $sqlp->select(@sql);
 is(std($sql), "SELECT r1 , r2 FROM tbl WHERE r1 = 'v1' AND w2 = 'v2'", 'select(SQL)');
 
-$sql = $pico->select($hash);
+$sql = $sqlp->select($hash);
 is(std($sql), "SELECT r1 , r2 FROM tbl WHERE p1 = 'i1' AND p2 = 'i2'", 'select(HASH)');
 
-$sql = $pico->insert($hash);
+$sql = $sqlp->insert($hash);
 is(std($sql), "INSERT INTO tbl ( w1 , w2 ) VALUES ('v1', 'v2')", 'insert(HASH)');
 
-$sql = $pico->update($hash, @sql);
+$sql = $sqlp->update($hash, @sql);
 is(std($sql), "UPDATE tbl SET w1 = 'v1', w2 = 'v2' WHERE r1 = 'v1' AND w2 = 'v2'", 'update(HASH, SQL)');
 
-$sql = $pico->update($hash, $hash);
+$sql = $sqlp->update($hash, $hash);
 is(std($sql), "UPDATE tbl SET w1 = 'v1', w2 = 'v2' WHERE p1 = 'i1' AND p2 = 'i2'", 'update(HASH, HASH)');
 
-$sql = $pico->delete(@sql);
+$sql = $sqlp->delete(@sql);
 is(std($sql), "DELETE FROM tbl WHERE r1 = 'v1' AND w2 = 'v2'", 'delete(SQL)');
 
-$sql = $pico->delete($hash);
+$sql = $sqlp->delete($hash);
 is(std($sql), "DELETE FROM tbl WHERE p1 = 'i1' AND p2 = 'i2'", 'delete(HASH)');
 
-$sql = $pico->count;
+$sql = $sqlp->count;
 is(std($sql), "SELECT count(*) FROM tbl", 'count()');
 
-$sql = $pico->count(@sql);
+$sql = $sqlp->count(@sql);
 is(std($sql), "SELECT count(*) FROM tbl WHERE r1 = 'v1' AND w2 = 'v2'", 'count(SQL)');
 
-$sql = $pico->count($hash);
+$sql = $sqlp->count($hash);
 is(std($sql), "SELECT count(*) FROM tbl WHERE p1 = 'i1' AND p2 = 'i2'", 'count(HASH)');
