@@ -71,19 +71,30 @@ sub _arrayref {
 sub _where {
     my $self = shift;
 
-    # constant (soft) condition
-    if (! @_) {
-        my $const = $self->_where_const or return;
-        my $where = join " AND " => @$const;
-        return "WHERE $where";
+    my $const = $self->_where_const;
+    return $const unless @_;
+
+    my $hashash = (ref $_[0] && Scalar::Util::reftype($_[0]) eq 'HASH');
+    my $primary = $self->_where_primary(shift) if $hashash;
+
+    my $rest = $self->bind(@_) if @_;
+
+    my $where = $const;
+    if ($where && $primary) {
+        $primary =~ s/^\s*(WHERE\s+)/AND /i;
+        $where = "$where $primary";
+    } elsif ($primary) {
+        $where = $primary;
     }
 
-    my $arg = shift;
-    if (! @_ && ref $arg && Scalar::Util::reftype($arg) eq 'HASH') {
-        return $self->_where_primary($arg);
-    } else {
-        return $self->_where_sql($arg, @_);
+    if ($where && $rest) {
+        $rest =~ s/^\s*(WHERE\s+)/AND /i;
+        $where = "$where $rest";
+    } elsif ($rest) {
+        $where = $rest;
     }
+
+    $where;
 }
 
 sub _where_const {
@@ -91,45 +102,27 @@ sub _where_const {
     my $const = _arrayref($self->condition);
     @$const = grep {defined $_ && $_ ne ''} @$const;
     return unless @$const;
-    @$const = map {/\Wor\W/i ? "($_)" : $_} @$const;
-    $const;
+    @$const = map {/^[^\(].*\Wor\W.*[^\)]$/is ? "($_)" : $_} @$const;
+    my $where = join " AND " => @$const;
+    "WHERE $where";
 }
 
 sub _where_primary {
     my $self = shift;
     my $cond = shift;
+
     my $primary = _arrayref($self->primary);
-    my $list = [];
+    my $keys    = [grep {exists $cond->{$_}} @$primary];
 
-    # constant (soft) condition
-    my $const = $self->_where_const;
-    push(@$list, @$const) if ref $const;
-
-    # dinamyc (primary key) condition
-    foreach my $key (@$primary) {
-        Carp::croak "Primary key \"$key\" not found in the condition" unless exists $cond->{$key};
-        my $qkey = $self->quote_identifier($key);
-        my $qcon = $self->bind("$qkey = ?" => $cond->{$key});
-        push(@$list, $qcon);
+    if (scalar @$primary != scalar @$keys) {
+        my $miss  = [grep {! exists $cond->{$_}} @$primary];
+        my $mjoin = join '", "' => @$miss;
+        Carp::croak "Primary key \"$mjoin\" not found in the condition";
     }
 
-    my $where = join " AND " => @$list;
+    my $pair  = [map {$_ => $cond->{$_}} @$keys];
+    my $where = join " AND " => $self->bind("?? = ?" => @$pair);
     "WHERE $where";
-}
-
-sub _where_sql {
-    my $self  = shift;
-    my $state = $self->bind(@_) if @_;
-
-    # constant (soft) condition
-    my $const = $self->_where_const;
-    return $state unless ref $const;
-
-    my $where = join " AND " => @$const;
-    return "WHERE $where" unless defined $state;
-
-    $state =~ s/^\s*(WHERE\s+)/AND /i;
-    "WHERE $where $state";
 }
 
 sub _is_star {
@@ -141,11 +134,10 @@ sub index {
     my $self  = shift;
     my $where = $self->_where(@_);
 
-    my $primary  = _arrayref($self->primary);
-    my $pjoin = join ", " => $self->quote_identifier(@$primary);
+    my $keys = _arrayref($self->primary);
+    my $join = join ", " => $self->quote_identifier(@$keys);
 
-    my $table = $self->quote_identifier($self->table);
-    my $sql   = "SELECT $pjoin FROM $table";
+    my $sql = $self->bind("SELECT ??? FROM ??", $join, $self->table);
     $sql .= " $where" if defined $where;
     $sql;
 }
@@ -155,11 +147,10 @@ sub select {
     my $where = $self->_where(@_);
 
     my $column = _arrayref($self->readable);
-    my $cjoin  = _is_star($column);
-    $cjoin ||= join ", " => $self->quote_identifier(@$column);
+    my $join   = _is_star($column);
+    $join ||= join ", " => $self->quote_identifier(@$column);
 
-    my $table = $self->quote_identifier($self->table);
-    my $sql   = "SELECT $cjoin FROM $table";
+    my $sql = $self->bind("SELECT ??? FROM ??", $join, $self->table);
     $sql .= " $where" if defined $where;
     $sql;
 }
@@ -172,15 +163,13 @@ sub insert {
     $column = [sort keys %$hash] if _is_star($column);
 
     my $keys  = [grep {exists $hash->{$_}} @$column];
-    my $vals  = [map {$hash->{$_}} @$keys];
-
     Carp::croak "INSERT without a column is not allowed" unless @$keys;
 
+    my $vals  = [map {$hash->{$_}} @$keys];
     my $kjoin = join ", " => $self->quote_identifier(@$keys);
     my $vjoin = join ", " => $self->quote(@$vals);
 
-    my $table = $self->quote_identifier($self->table);
-    my $sql   = "INSERT INTO $table ($kjoin) VALUES ($vjoin)";
+    my $sql = $self->bind("INSERT INTO ?? (???) VALUES (???)", $self->table, $kjoin, $vjoin);
 }
 
 sub update {
@@ -195,16 +184,12 @@ sub update {
     my $keys = [grep {exists $hash->{$_}} @$column];
     Carp::croak "No column will be updated" unless @$keys;
 
-    # my $sets  = [map {$self->bind("?? = ?" => $_, $hash->{$_})} @$keys];
-    # my $sjoin = join ", " => @$sets;
+    my $pair  = [map {$_ => $hash->{$_}} @$keys];
+    my $sjoin = join ", " => $self->bind("?? = ?" => @$pair);
 
-    my $vals  = [map {$hash->{$_}} @$keys];
-    my %pairs;
-    @pairs{@$keys} = @$vals;
-    my $sjoin = join ", " => $self->bind("?? = ?" => %pairs);
-
-    my $table = $self->quote_identifier($self->table);
-    my $sql   = "UPDATE $table SET $sjoin $where";
+    my $sql = $self->bind("UPDATE ?? SET ???", $self->table, $sjoin);
+    $sql .= " $where" if defined $where;
+    $sql;
 }
 
 sub delete {
@@ -212,17 +197,17 @@ sub delete {
     my $where = $self->_where(@_);
     Carp::croak 'DELETE without a condition is not allowed' unless defined $where;
 
-    my $table = $self->quote_identifier($self->table);
-    my $sql   = "DELETE FROM $table $where";
+    my $sql = $self->bind("DELETE FROM ??", $self->table);
+    $sql .= " $where" if defined $where;
+    $sql;
 }
 
 sub count {
-    my $self = shift;
+    my $self  = shift;
     my $where = $self->_where(@_);
 
-    my $table = $self->quote_identifier($self->table);
-    my $sql   = "SELECT count(*) FROM $table";
-    $sql .= " $where" if $where;
+    my $sql = $self->bind("SELECT count(*) FROM ??", $self->table);
+    $sql .= " $where" if defined $where;
     $sql;
 }
 
@@ -279,13 +264,13 @@ This specifies L<DBI> instance to call a valid C<quote()> method for each driver
 
 =head2 table
 
-This specifies a table name to manipulate.
+This is required to specify a table name to manipulate.
 
     $mytbl->table('mytable');
 
 =head2 primary
 
-This specifies primary key(s) of the table.
+This is required to specify primary key(s) of the table.
 
     $mytbl->primary('id');
 
@@ -316,17 +301,17 @@ Default value is C<'*'> which means all columns are writable.
 
 =head2 condition
 
-This specifies a static condition which is always applied at C<WHERE> statement.
+This specifies a static condition which is always applied at C<WHERE> clause.
 
     $mytbl->condition('deleted = 0');
 
-Default value is null which means no static condition is applied.
+Default value is an empty which means no static condition is applied.
 
 =head1 METHODS
 
 This module provides four methods to build a SQL statement for basic CRUD
 operations and C<index()> and C<count()> methods for your convenience.
-Literals and identifiers are propery quoted.
+Literals and identifiers are properly quoted.
 
 At the sample codes below, parameters are initialized as following.
 
@@ -336,7 +321,7 @@ At the sample codes below, parameters are initialized as following.
     $mytbl->readable(qw( name price ));
     $mytbl->writable(qw( name price ));
 
-=head2 select(CONDITION)
+=head2 select(CONDITION, CLAUSE...)
 
 This builds a C<SELECT> statement which reads record(s) from database.
 
@@ -345,18 +330,35 @@ This builds a C<SELECT> statement which reads record(s) from database.
     $hash = $dbh->selectrow_hashref($sql);
 
 This builds a C<SELECT> statement which returns a record
-specified by primary keys.
-Only primary keys in given hashref are used as a condition.
-Primary keys must be specified by C<primary()> accessor in advance.
-Please note that this style is not a generic condition builder.
+specified by primary keys given as a hashref.
+C<WHERE> clause is built by using only primary keys
+which are specified by C<primary()> accessor in advance.
 Any other keys than C<primary> keys in given hashref are ignored.
+
+Please note that a hashref is used to build a condition using
+primary key but is not to build a generic condition.
+A hashref is not pretty enough to build a complex condition you need.
+Don't use Perl for it and use SQL to build a full condition instead.
+
+The first hashref argument is optional.
+This also accept a C<WHERE> clause which supports bind values.
+
+    # SELECT * FROM mytable WHERE price < '100'
+    $sql = $mytbl->select("WHERE price < ?", "100");
+    $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
+
+C<ORDER BY> clause and and some other clauses are also allowed.
+
+    # SELECT name, price FROM mytable WHERE id = '1' ORDER BY price DESC
+    $sql  = $mytbl->select({id => 1}, "ORDER BY price DESC");
+    $hash = $dbh->selectrow_hashref($sql);
+
+Without a condition nor clauses applied,
+this builds a C<SELECT> statement which returns all records.
 
     # SELECT name, price FROM mytable
     $sql       = $mytbl->select;
     $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
-
-Without a condition applied, this builds a C<SELECT> statement
-which returns all records.
 
 =head2 insert(KEYVAL)
 
@@ -366,10 +368,10 @@ This builds an C<INSERT> statement which creates a record.
     $sql = $mytbl->insert({name => 'corge', price => '100'});
     $dbh->do($sql) or die "insert failed";
 
-The argument is a hashref which contains C<writable> keys.
+The first argument is a required hashref which contains C<writable> keys.
 Any other keys than C<writable> keys in given hashref are ignored.
 
-=head2 update(KEYVAL, CONDITION)
+=head2 update(KEYVAL, CONDITION, CLAUSE...)
 
 This builds an C<UPDATE> statement which updates record(s).
 
@@ -377,13 +379,20 @@ This builds an C<UPDATE> statement which updates record(s).
     $sql = $mytbl->update({name => 'corge', price => '100'}, {id => 1});
     $dbh->do($sql) or die "update failed";
 
-The first argument is a hashref which contains C<writable> keys.
+The first argument is a required hashref which contains C<writable> keys.
 Any other keys than C<writable> keys in given hashref are ignored.
 
-The second argument is a hashref which contains C<primary> keys.
+The second argument is an optional hashref which contains C<primary> keys.
 Any other keys than C<primary> keys in given hashref are ignored.
 
-=head2 delete(CONDITION)
+This also accepts more arguments of C<WHERE> clause which supports bind values.
+This allows you to build more complex conditions.
+
+    # UPDATE mytable SET name = 'corge' WHERE price < '100'
+    $sql = $mytbl->update({name => 'corge'}, "WHERE price < ?", "100");
+    $dbh->do($sql) or die "update failed";
+
+=head2 delete(CONDITION, CLAUSE...)
 
 This builds a C<DELETE> statement which deletes record(s).
 
@@ -391,70 +400,75 @@ This builds a C<DELETE> statement which deletes record(s).
     $sql = $mytbl->delete({id => 1});
     $dbh->do($sql) or die "delete failed";
 
-The argument is a hashref which contains C<primary> keys.
+The argument is a optional hashref which contains C<primary> keys.
 Any other keys than C<primary> keys in given hashref are ignored.
 
-=head2 index(CONDITION)
-
-This builds a C<SELECT> statement which returns only primary keys
-of each records.
-
-    # SELECT id FROM mytable
-    $sql      = $mytbl->index;
-    $arrayref = $dbh->selectcol_arrayref($sql);
-
-Without a condition applied, this builds a C<SELECT> statement
-which returns all primary keys on the table.
-
-=head2 count(CONDITION)
-
-This builds a C<SELECT> statement which returns number of records.
-
-    # SELECT count(*) FROM mytable WHERE id = '1'
-    $sql   = $mytbl->count({id => 1});
-    $exist = $dbh->selectrow_array($sql);
-
-This is available to test whether a specified record exists or not.
-The argument is a hashref which contains C<primary> keys.
-Any other keys than C<primary> keys in given hashref are ignored.
-
-    # SELECT count(*) FROM mytable
-    $sql   = $mytbl->count;
-    $total = $dbh->selectrow_array($sql);
-
-Without a condition applied, this builds a C<SELECT> statement
-which returns the total number of records.
-
-=head2 Direct Condition
-
-C<select>, C<update>, C<delete>, C<index> and C<count> methods also
-allow a string of C<WHERE> clause as their condition argument.
-This uses C<bind> method internally to accept placeholders and bind values.
-
-    # SELECT * FROM mytable WHERE price < '100'
-    $sql = $mytbl->select("WHERE price < ?", "100");
-    $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
-
-    # UPDATE mytable SET name = 'corge' WHERE price < '100'
-    $sql = $mytbl->update({name => 'corge'}, "WHERE price < ?", "100");
-    $dbh->do($sql) or die "update failed";
+This also accepts more arguments of C<WHERE> clause which supports bind values.
+This allows you to build more complex conditions.
 
     # DELETE FROM mytable WHERE price < '100'
     $sql = $mytbl->delete("WHERE price < ?", "100");
     $dbh->do($sql) or die "delete failed";
 
+=head2 index(CONDITION, CLAUSE...)
+
+This builds a C<SELECT> statement which returns only primary keys
+of each records.
+
     # SELECT id FROM mytable WHERE price < '100'
     $sql = $mytbl->index("WHERE price < ?", "100");
     $arrayref = $dbh->selectcol_arrayref($sql);
+
+This accepts C<WHERE> and some other clause which supports bind values.
+
+    # SELECT id FROM mytable ORDER BY price DESC
+    $sql = $mytbl->index("ORDER BY price DESC");
+    $arrayref = $dbh->selectcol_arrayref($sql);
+
+Without a clause applied,
+this builds a C<SELECT> statement which returns all primary keys on the table.
+
+    # SELECT id FROM mytable
+    $sql      = $mytbl->index;
+    $arrayref = $dbh->selectcol_arrayref($sql);
+
+=head2 count(CONDITION, CLAUSE...)
+
+This builds a C<SELECT> statement which returns number of records.
+This is available to test whether a specified record exists or not.
+
+    # SELECT count(*) FROM mytable WHERE id = '1'
+    $sql   = $mytbl->count({id => 1});
+    $exist = $dbh->selectrow_array($sql);
+
+The first argument is an optional hashref which contains C<primary> keys.
+Any other keys than C<primary> keys in given hashref are ignored.
+
+This also accepts more arguments of C<WHERE> clause which supports bind values.
+This allows you to build more complex conditions.
 
     # SELECT count(*) FROM mytable WHERE price < '100'
     $sql = $mytbl->count("WHERE price < ?", "100");
     $total = $dbh->selectrow_array($sql);
 
-=head2 Methods Inherited
+Without a condition nor clauses applied,
+this builds a C<SELECT> statement which returns the total number of records.
 
-C<quote>, C<quote_identifier> and C<bind> methods are also available
-as this module inherites L<SQL::Pico> module.
+    # SELECT count(*) FROM mytable
+    $sql   = $mytbl->count;
+    $total = $dbh->selectrow_array($sql);
+
+=head2 quote(LITERAL)
+
+This is inherited from L<SQL::Pico> module.
+
+=head2 quote_identifier(IDENTIFIER)
+
+This is inherited from L<SQL::Pico> module.
+
+=head2 bind(CLAUSE, VALUES...)
+
+This is inherited from L<SQL::Pico> module.
 
 =head1 SUBCLASSING
 
@@ -478,7 +492,8 @@ parameters.
 
 You need to provide a couple of methods C<_build_table()> and
 C<_build_primary()> to provide those default values at least.
-Those methods will be called to set initial values on demand.
+Those methods will be called to set initial values on demand
+like L<Moose>'s C<lazy_build> optoin does.
 
 C<_build_readable()>, C<_build_writable()> and C<_build_condition()>
 methods are available as well.
@@ -499,5 +514,11 @@ Copyright 2012 Yusuke Kawasaki
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
+
+=head1 SEE ALSO
+
+L<SQL::Pico> is the parent class of this.
+
+L<SQL::Abstract::Query> provides a list of other SQL generators as reference.
 
 =cut

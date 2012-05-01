@@ -15,40 +15,40 @@ use_ok 'SQL::Pico';
 
 use SQL::Pico ();                         # nothing exported
 
-my($dbh, $sqlp, $quoted, $sql, @list);
+my($dbh, $sp, $quoted, $sql, @list);
 
 $dbh    = DBI->connect('dbi:SQLite::memory:','','',{});
 ok(ref $dbh, 'connect');
 my $name = $dbh->{Driver}->{Name} || '';
 isnt($name, '', 'Driver Name - '.$name);
 
-$sqlp   = SQL::Pico->new->dbh($dbh);
-isa_ok($sqlp, 'SQL::Pico');
+$sp   = SQL::Pico->new->dbh($dbh);
+isa_ok($sp, 'SQL::Pico');
 
-my $name2 = $sqlp->dbh->{Driver}->{Name} || '';
+my $name2 = $sp->dbh->{Driver}->{Name} || '';
 is($name2, $name, 'Driver Name - '.$name2);
 
 my $val = 'foo';
-$quoted = $sqlp->quote($val);             # $dbh->quote($val)
+$quoted = $sp->quote($val);             # $dbh->quote($val)
 is($quoted, "'foo'", 'quote');
 
 my $key = 'bar';
-$quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
+$quoted = $sp->quote_identifier($key);  # $dbh->quote_identifier($key)
 is($quoted, '"bar"', 'quote_identifier');
 
 my $table = 'hoge';
 my $id = 'fuga';
-$sql    = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+$sql    = $sp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
 is($sql, "SELECT * FROM \"hoge\" WHERE id = 'fuga'", 'bind');
 
 my @vals = qw(baz qux);
-@list   = $sqlp->quote(@vals);            # multiple quotes at once
+@list   = $sp->quote(@vals);            # multiple quotes at once
 is(scalar(@list), 2, 'quote length');
 is($list[0], "'baz'", 'quote 0');
 is($list[1], "'qux'", 'quote 1');
 
 my @keys = qw(quux corge);
-@list   = $sqlp->quote_identifier(@keys); # ditto.
+@list   = $sp->quote_identifier(@keys); # ditto.
 is(scalar(@list), 2, 'quote_identifier length');
 is($list[0], '"quux"', 'quote_identifier 0');
 is($list[1], '"corge"', 'quote_identifier 1');
@@ -62,38 +62,38 @@ is($quoted, '"table_name"', 'k');
 $sql    = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
 is($sql, "SELECT * FROM \"hoge\" WHERE id = 'fuga'", 'sql');
 
-$sqlp = SQL::Pico->new(dbh => $dbh);
-$name2 = $sqlp->dbh->{Driver}->{Name} || '';
+$sp = SQL::Pico->new(dbh => $dbh);
+$name2 = $sp->dbh->{Driver}->{Name} || '';
 is($name2, $name, 'Driver Name - '.$name2);
 
-$sqlp = SQL::Pico->new;
-$name2 = $sqlp->dbh->{Driver}->{Name} || '';
+$sp = SQL::Pico->new;
+$name2 = $sp->dbh->{Driver}->{Name} || '';
 isnt($name2, $name, 'Driver Name - '.$name2);
 
-$sqlp->dbh($dbh);
-$name2 = $sqlp->dbh->{Driver}->{Name} || '';
+$sp->dbh($dbh);
+$name2 = $sp->dbh->{Driver}->{Name} || '';
 is($name2, $name, 'Driver Name - '.$name2);
 
 $quoted = SQL::Pico->new->dbh($dbh)->quote($val);
 is($quoted, "'foo'", 'quote');
 
-$quoted = $sqlp->quote($val);             # $dbh->quote($val)
+$quoted = $sp->quote($val);             # $dbh->quote($val)
 is($quoted, "'foo'", 'quote');
 
-@list   = $sqlp->quote(@vals);            # multiple quotes at once
+@list   = $sp->quote(@vals);            # multiple quotes at once
 is(scalar(@list), 2, 'quote length');
 is($list[0], "'baz'", 'quote 0');
 is($list[1], "'qux'", 'quote 1');
 
-$quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
+$quoted = $sp->quote_identifier($key);  # $dbh->quote_identifier($key)
 is($quoted, '"bar"', 'quote_identifier');
 
-@list   = $sqlp->quote_identifier(@keys); # multiple quotes at once
+@list   = $sp->quote_identifier(@keys); # multiple quotes at once
 is(scalar(@list), 2, 'quote_identifier length');
 is($list[0], '"quux"', 'quote_identifier 0');
 is($list[1], '"corge"', 'quote_identifier 1');
 
-$sql = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+$sql = $sp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
 is($sql, "SELECT * FROM \"hoge\" WHERE id = 'fuga'", 'sql');
 
 SQL::Pico->dbh($dbh);

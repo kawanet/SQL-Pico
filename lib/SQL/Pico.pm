@@ -90,43 +90,60 @@ __END__
 
 =head1 NAME
 
-SQL::Pico - Prebinded Raw SQL Statement Builder
+SQL::Pico - Prebuilt Raw SQL Statement Builder
 
 =head1 SYNOPSIS
 
     use SQL::Pico ();
     
     $dbh    = DBI->connect(...);
-    $sqlp   = SQL::Pico->new->dbh($dbh);
-    $quoted = $sqlp->quote($val);             # $dbh->quote($val)
-    $quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
+    $sp     = SQL::Pico->new->dbh($dbh);
+    $quoted = $sp->quote($val);             # $dbh->quote($val)
+    $quoted = $sp->quote_identifier($key);  # $dbh->quote_identifier($key)
 
-    $select = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $select = $sp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
     
-    $where  = join(" AND " => $sqlp->bind("?? = ?", %hash));
-    $select = $sqlp->bind("SELECT * FROM mytbl WHERE ???", $where);
+    $where  = join(" AND " => $sp->bind("?? = ?", %hash));
+    $select = $sp->bind("SELECT * FROM mytbl WHERE ???", $where);
 
-    $keys   = join(", " => $sqlp->quote_identifier(keys %hash));
-    $vals   = join(", " => $sqlp->quote(values %hash));
-    $insert = $sqlp->bind("INSERT INTO mytbl (???) VALUES (???)", $keys, $vals);
+    $keys   = join(", " => $sp->quote_identifier(keys %hash));
+    $vals   = join(", " => $sp->quote(values %hash));
+    $insert = $sp->bind("INSERT INTO mytbl (???) VALUES (???)", $keys, $vals);
 
-    $sets   = join(", " => $sqlp->bind("?? = ?", %hash));
-    $update = $sqlp->bind("UPDATE mytbl SET ??? WHERE id = ?", $sets, $id);
+    $sets   = join(", " => $sp->bind("?? = ?", %hash));
+    $update = $sp->bind("UPDATE mytbl SET ??? WHERE id = ?", $sets, $id);
 
-    $in     = join(", " => v(@list));
-    $delete = $sqlp->bind("DELETE mytbl WHERE id IN (???)", $in);
+    $in     = join(", " => $sp->quote(@list));
+    $delete = $sp->bind("DELETE mytbl WHERE id IN (???)", $in);
 
 =head1 DESCRIPTION
 
-This provides a simple but safe way to build SQL statements
+This provides a simple but safe way to build raw SQL statements
 without learning any other languages than Perl and SQL.
+C<SQL::Pico> is lightweight and doesn't require any non-core modules
+except for L<DBI>.
 
-Most of ORM modules and something SQL::Builder modules would have
-required you to understand a complex structure or dialectal DSL.
-This module provides just one new method of C<bind()>,
-which allows you to build raw SQL statements with placeholders,
+C<SQL::Pico>'s C<bind()> method generates a SQL statement
+which placeholders are filled with immediate values bound.
+This makes you free from handling bind values and calling C<prepare()>.
+See C<RECIPES> section below.
+
+=head2 Why "Prebuilt" SQL?
+
+Because SQL is the most simplest language to comunicate with RDBMS.
+
+The most of ORM modules and something I<SQL::Builder>-ish modules would have
+required you to understand its complex class structure or dialectal DSL.
+
+This module simply provides just one of new method, C<bind()>,
+which allows you to build SQL statements using placeholders,
 as well as C<quote()> and C<quote_identifier()> methods
-which are wrappers of L<DBI>'s same methods you already know.
+which are wrappers for C<DBI>'s methods with the same name you already know.
+
+The most of modern Web applications would not cache prepared C<$sth>
+instances though they would cache a connected C<$dbh> instance.
+It means you don't need to worry about its performance (dis)advantage
+when you don't use bind values at C<execute()>.
 
 =head1 METHODS
 
@@ -134,59 +151,64 @@ which are wrappers of L<DBI>'s same methods you already know.
 
 This creates a C<SQL::Pico> instance.
 
-    $sqlp = SQL::Pico->new;
+    $sp = SQL::Pico->new;
 
 This accepts key/value pair(s) as its initial parameters.
 Only C<dbh> parameter is available at this module.
 
-    $sqlp = SQL::Pico->new(dbh => $dbh);
+    $sp = SQL::Pico->new(dbh => $dbh);
 
 =head2 dbh(DBHANDLE)
 
-This is accessor to specify a C<DBI> instance.
+This is an accessor to specify a C<DBI> instance.
 
-    $sqlp = SQL::Pico->new;
-    $sqlp->dbh($dbh);
+    $sp = SQL::Pico->new;
+    $sp->dbh($dbh);
 
-The setter returns the current C<SQL::Pico> instance for you
-to chain method calls.
+The setter returns the current C<SQL::Pico> instance
+for you to chain method calls.
 
     $quoted = SQL::Pico->new->dbh($dbh)->quote($val);
 
-The quoting format depends on database systems.
+Please note that quoting formats for literals and identifiers
+depend on RDBMS server you connect.
 For example, a literal string "Don't" would be quoted as
-'Don''t', 'Don\'t', "Don't", etc.
-You need to specify a C<DBI> instance to make string quoted propery.
+'Don''t' in a server, as well as 'Don\'t', "Don't", etc. in others.
+
+This supports SQL-92 Standard's quoting format, per default,
+under L<DBD::NullP> driver which is included in C<DBI> distribution.
+You could specify a C<DBI> instance to make string quoted properly
+for your RDBMS server.
 
 =head2 quote(LITERAL)
 
 This calls C<DBI>'s C<quote()> method internally.
 
-    $quoted = $sqlp->quote($val);             # $dbh->quote($val)
+    $quoted = $sp->quote($val);             # $dbh->quote($val)
 
 This doesn't accept literal's data type specified at its second argument.
 The other difference to original is that this accept multiple arguments
 and returns them quoted.
 
-    @list   = $sqlp->quote(@vals);            # multiple quotes at once
+    @list   = $sp->quote(@vals);            # multiple quotes at once
 
 =head2 quote_identifier(IDENTIFIER)
 
 This calls C<DBI>'s C<quote_identifier()> method internally.
 
-    $quoted = $sqlp->quote_identifier($key);  # $dbh->quote_identifier($key)
+    $quoted = $sp->quote_identifier($key);  # $dbh->quote_identifier($key)
 
 Multiple arguments are allowed as well.
 
-    @list   = $sqlp->quote_identifier(@keys); # multiple quotes at once
+    @list   = $sp->quote_identifier(@keys); # multiple quotes at once
 
 =head2 bind(SQL, VALUES...)
 
 This builds a SQL statement by using placeholders with bind values.
 
-    $sql = $sqlp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $sql = $sp->bind("SELECT * FROM ?? WHERE id = ?", $table, $id);
 
-Note that this returns a SQL statement built with values binded
+Note that this returns a SQL statement built with values bound
 at the method prior to C<DBI>'s <execute()> method called.
 
 Three types of placeholders are allowed at the first argument:
@@ -200,37 +222,32 @@ which will be escaped by C<quote_identifier()>.
 Triple characters of C<???> represents a placeholder for a raw SQL
 string which will not be escaped.
 
-    $hash   = {"qux" => "foo", "quux" => "bar", "corge" => "baz"};
-    @list   = $sqlp->bind("?? = ?", %$hash);
+    $hash   = {"category" => "foo", "price" => "100"};
+    @list   = $sp->bind("?? = ?", %$hash);
     $where  = join(" AND ", @list);
     $select = "SELECT * FROM mytable WHERE $where";
 
-    # WHERE "qux" = 'foo' AND "quux" = 'bar' AND "corge" = 'baz'
-    # Note that the order of key/value pairs varies.
+    # SELECT * FROM mytable WHERE "category" = 'foo' AND "price" = '100'
+    # Note that the order of key/value pairs vary.
 
-In list context, this returns a list of strings repeatedly binded
+In list context, this returns a list of strings repeatedly built
 with parameters following.
-It'd be useful to build C<WHERE>, C<VALUES>, C<SET>, C<IN> clause, etc.
 
 =head1 FUNCTIONS
 
 In addition to the OO style described above, this also supports
-the functional style and exports three shortcut functions:
+the functional style below by exporting three shortcut functions:
 C<v()>, C<k()> and C<sql()> per default.
 
     use SQL::Pico;                            # functions exported
     
-    $quoted = v("string");                    # quotes literal
-    $quoted = k("table_name");                # quotes identifier
-    $sql    = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
-
 =head2 v(LITERAL)
 
 This is a shortcut for C<quote()> method
 which quotes a literal, e.g. string, number, etc.
 
     $quoted = v("string");                    # quotes literal
-    @quoted = v("foo", "bar", "baz");         # multiple literals
+    @quoted = v("foo", "bar", "100");         # multiple literals
 
 =head2 k(IDENTIFIER)
 
@@ -238,24 +255,70 @@ This is a shortcut for C<quote_identifier()> method
 which quotes an identifier, e.g. table name, column name, etc.
 
     $quoted = k("table_name");                # quotes identifier
-    @quoted = k("qux", "quux", "corge");      # multiple identifiers
+    @quoted = k("category", "name", "price"); # multiple identifiers
 
 =head2 sql(SQL, VALUES...)
 
 This is a shortcut for C<bind()> method
 which builds a SQL statement by using placeholders with bind values.
 
-    $sql  = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
+    $select = sql("SELECT * FROM ?? WHERE id = ?", $table, $id);
 
 =head2 dbh(DBHANDLE)
 
-Use C<dbh()> class method to specify the default database handle
+Call C<dbh()> class method to specify the database handle
 for those C<v()>, C<k()> and C<sql()> functions above.
 
     $dbh = DBI->connect(...);
     SQL::Pico->dbh($dbh);
 
 Note that C<dbh()> method is not exported.
+
+=head1 RECIPES
+
+The recipes show which C<DBI> methods would follow SQL statements
+built by C<sql()> function.
+
+    # fetch a single record as a hahsref
+    $sql   = sql("SELECT * FROM mytable WHERE id = ?", $id);
+    $hash  = $dbh->selectrow_hashref($sql);
+    
+    # fetch multiple records as an arrayref of hashrefs
+    $in    = join(", " => v(@list));
+    $sql   = sql("SELECT * FROM mytable WHERE id IN (???)", $in);
+    $array = $dbh->selectall_arrayref($sql, {Slice=>{}});
+    
+    # fetch a list of a single column as an arrayref
+    $sql   = sql("SELECT id FROM mytable WHERE price < ?", $price);
+    $array = $dbh->selectcol_arrayref($sql);
+    
+    # fetch a list of a pair column as an arrayref then a hashref
+    $sql   = sql("SELECT id, name FROM mytable WHERE price < ?", $price);
+    $array = $dbh->selectall_arrayref($sql);
+    $hash  = +{ map { $_->[0] => $_->[1] } @$array };
+    
+    # check a record exists as a scalar
+    $sql   = sql("SELECT count(*) FROM mytable WHERE id = ?", $id);
+    $exist = $dbh->selectrow_array($sql);
+    
+    # count total number of records as a scalar
+    $sql   = sql("SELECT count(*) FROM mytable WHERE price < ?", $price);
+    $count = $dbh->selectrow_array($sql);
+    
+    # insert a record with a hashref
+    $keys  = join(", " => k(keys %$hash));
+    $vals  = join(", " => v(values %$hash));
+    $sql   = sql("INSERT INTO mytable (???) VALUES (???)", $keys, $vals);
+    $dbh->do($sql) or die "insert failed";
+    
+    # update a record with a hashref
+    $sets  = join(", " => sql("?? = ?", %$hash));
+    $sql   = sql("UPDATE mytable SET ??? WHERE id = ?", $sets, $id);
+    $dbh->do($sql) or die "update failed";
+    
+    # delete a record
+    $sql   = sql("DELETE mytable WHERE id = ?", $id);
+    $dbh->do($sql) or die "delete failed";
 
 =head1 AUTHOR
 
@@ -277,7 +340,5 @@ it under the same terms as Perl itself.
 =head1 SEE ALSO
 
 L<DBI> executes SQL statements built by the module.
-
-L<SQL::Abstract::Query> provides a list of other SQL generators as reference.
 
 =cut

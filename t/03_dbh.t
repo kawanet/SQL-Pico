@@ -16,19 +16,19 @@ my $sponge = DBI->connect('dbi:Sponge:');
 ok(ref $sponge, 'Sponge');
 is($sponge->{Driver}->{Name}, 'Sponge', 'Sponge - name');
 
-my $sqlp;
+my $sp;
 
-$sqlp = SQL::Pico->new(dbh => $nullp);
-is($sqlp->dbh->{Driver}->{Name}, 'NullP', 'NullP - new');
+$sp = SQL::Pico->new(dbh => $nullp);
+is($sp->dbh->{Driver}->{Name}, 'NullP', 'NullP - new');
 
-$sqlp = SQL::Pico->new(dbh => $sponge);
-is($sqlp->dbh->{Driver}->{Name}, 'Sponge', 'Sponge - new');
+$sp = SQL::Pico->new(dbh => $sponge);
+is($sp->dbh->{Driver}->{Name}, 'Sponge', 'Sponge - new');
 
-$sqlp = SQL::Pico->dbh($nullp);
-is($sqlp->dbh->{Driver}->{Name}, 'NullP', 'NullP - dbh');
+$sp = SQL::Pico->dbh($nullp);
+is($sp->dbh->{Driver}->{Name}, 'NullP', 'NullP - dbh');
 
-$sqlp->dbh($sponge);
-is($sqlp->dbh->{Driver}->{Name}, 'Sponge', 'Sponge - dbh');
+$sp->dbh($sponge);
+is($sp->dbh->{Driver}->{Name}, 'Sponge', 'Sponge - dbh');
 
-$sqlp->dbh($nullp);
-is($sqlp->dbh->{Driver}->{Name}, 'NullP', 'NullP - dbh');
+$sp->dbh($nullp);
+is($sp->dbh->{Driver}->{Name}, 'NullP', 'NullP - dbh');

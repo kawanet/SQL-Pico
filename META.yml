@@ -1,7 +1,7 @@
 --- #YAML:1.0
 name:               SQL-Pico
 version:            0.01
-abstract:           Prebinded Raw SQL Statement Builder
+abstract:           Prebuilt Raw SQL Statement Builder
 author:
     - Yusuke Kawasaki
 license:            perl
