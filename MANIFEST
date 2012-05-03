@@ -8,9 +8,10 @@ lib/SQL/Pico/Table.pm
 t/00_compile.t
 t/01_functional.t
 t/02_oo.t
-t/03_dbh.t
-t/04_error.t
+t/03_accessor.t
+t/04_dbh.t
 t/05_practical.t
+t/06_error.t
 t/10_compile.t
 t/11_oo.t
 t/12_internal.t

@@ -8,39 +8,7 @@ our $VERSION = '0.01';
 use Carp;
 use Scalar::Util;
 
-sub table {
-    my $self = shift;
-    return $self->{table} = shift if @_;
-    $self->{table} ||= $self->_build_table;
-}
-
-sub primary {
-    my $self = shift;
-    $self->{primary} = _arrayref(@_) if @_;
-    my $array = $self->{primary} ||= _arrayref($self->_build_primary);
-    wantarray ? @$array : $array->[0] if ref $array;
-}
-
-sub readable {
-    my $self = shift;
-    $self->{readable} = _arrayref(@_) if @_;
-    my $array = $self->{readable} ||= _arrayref($self->_build_readable);
-    wantarray ? @$array : $array->[0] if ref $array;
-}
-
-sub writable {
-    my $self = shift;
-    $self->{writable} = _arrayref(@_) if @_;
-    my $array = $self->{writable} ||= _arrayref($self->_build_writable);
-    wantarray ? @$array : $array->[0] if ref $array;
-}
-
-sub condition {
-    my $self = shift;
-    $self->{condition} = _arrayref(@_) if @_;
-    my $array = $self->{condition} ||= _arrayref($self->_build_condition);
-    wantarray ? @$array : $array->[0] if ref $array;
-}
+SQL::Pico::Util::Accessor->import(qw( table primary readable writable condition ));
 
 sub _build_table {
     Carp::croak "table name not defined";
@@ -347,11 +315,11 @@ This also accept a C<WHERE> clause which supports bind values.
     $sql = $mytbl->select("WHERE price < ?", "100");
     $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
 
-C<ORDER BY> clause and and some other clauses are also allowed.
+C<ORDER BY> clause and and some other clauses are allowed as well.
 
-    # SELECT name, price FROM mytable WHERE id = '1' ORDER BY price DESC
-    $sql  = $mytbl->select({id => 1}, "ORDER BY price DESC");
-    $hash = $dbh->selectrow_hashref($sql);
+    # SELECT name, price FROM mytable ORDER BY price DESC
+    $sql  = $mytbl->select("ORDER BY price DESC");
+    $hasharray = $dbh->selectall_arrayref($sql, {Slice=>{}});
 
 Without a condition nor clauses applied,
 this builds a C<SELECT> statement which returns all records.

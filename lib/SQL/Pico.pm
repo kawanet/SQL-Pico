@@ -1,14 +1,15 @@
 package SQL::Pico;
 use strict;
 use warnings;
-use base 'Exporter';
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
+our @ISA     = qw(SQL::Pico::Base);
 our @EXPORT  = qw(v k sql);
 our @DSN     = ("dbi:NullP:");
 
 use Carp;
 use DBI;
+use Exporter 'import';
 
 sub v {
     __PACKAGE__->instance->quote(@_);
@@ -22,11 +23,6 @@ sub sql {
     __PACKAGE__->instance->bind(@_);
 }
 
-sub new {
-    my $class = shift;
-    bless {@_}, $class;
-}
-
 my $instance;
 sub instance {
     my $self = shift;
@@ -37,11 +33,7 @@ sub instance {
 sub dbh {
     my $self = shift;
     $self = $self->instance unless ref $self;
-    if (@_) {
-        $self->{dbh} = shift;
-        return $self;
-    }
-    $self->{dbh} ||= DBI->connect(@DSN);
+    $self->SUPER::dbh(@_);
 }
 
 sub quote {
@@ -82,6 +74,55 @@ sub bind {
         Carp::croak "Too many parameters given" unless wantarray;
     }
     wantarray ? @$list : shift @$list;
+}
+
+package SQL::Pico::Base;
+
+SQL::Pico::Util::Accessor->import(qw( dbh ));
+
+sub new {
+    my $class = shift;
+    bless {@_}, $class;
+}
+
+sub _build_dbh {
+    DBI->connect(@SQL::Pico::DSN);
+}
+
+package SQL::Pico::Util::Accessor;
+
+sub import {
+    shift;
+    return unless @_;
+    my $package = caller();
+    mk_accessors($package, @_);
+}
+
+sub mk_accessors {
+    my $package = shift;
+    foreach my $field (@_) {
+        my $accessor = $package.'::'.$field;
+        my $builder  = '_build_'.$field;
+        my $sub = sub {
+            my $self = shift;
+            $self = $self->new unless ref $self;
+            if (@_ == 0) {
+                my $v = $self->{$field};
+                unless (defined $v) {
+                    my @v = $self->$builder();
+                    return unless @v;
+                    $v = (@v == 1 && ! ref $v[0]) ? shift @v : \@v;
+                    $self->{$field} = $v;
+                }
+                return $v unless (ref $v eq 'ARRAY');
+                return wantarray ? @$v : $v->[0];
+            }
+            $self->{$field} = (@_ == 1 && ! ref $_[0]) ? shift : \@_;
+            $self;
+        };
+        no strict 'refs';
+        *{$accessor} = $sub;
+    }
 }
 
 1;

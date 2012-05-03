@@ -1,7 +1,7 @@
 use strict;
 use Test::More tests => 18;
 
-BEGIN { use_ok 'SQL::Pico::Table' }
+use_ok 'SQL::Pico::Table';
 
 my $sp = SQL::Pico::Table->new;
 my $test;
@@ -46,16 +46,19 @@ is($test[1], 'bar', 'condition 2 bar');
 # arrayref
 
 $sp->readable(['foo', 'bar']);
+$test = $sp->readable;
+is_deeply($test, ['foo', 'bar'], 'readable 3 scalar');
 @test = $sp->readable;
-is($test[0], 'foo', 'readable 3 foo');
-is($test[1], 'bar', 'readable 3 bar');
+is_deeply(\@test, [['foo', 'bar']], 'readable 3 array');
 
 $sp->writable(['foo', 'bar']);
+$test = $sp->writable;
+is_deeply($test, ['foo', 'bar'], 'readable 3 scalar');
 @test = $sp->writable;
-is($test[0], 'foo', 'writable 3 foo');
-is($test[1], 'bar', 'writable 3 bar');
+is_deeply(\@test, [['foo', 'bar']], 'readable 3 array');
 
 $sp->condition(['foo', 'bar']);
+$test = $sp->condition;
+is_deeply($test, ['foo', 'bar'], 'condition 3 scalar');
 @test = $sp->condition;
-is($test[0], 'foo', 'condition 3 foo');
-is($test[1], 'bar', 'condition 3 bar');
+is_deeply(\@test, [['foo', 'bar']], 'condition 3 array');
